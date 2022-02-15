@@ -4,6 +4,8 @@
 
 #include "../resource.h"
 
+#define NOTIFICATION_TRAY_ICON_MSG (WM_USER + 0x100)
+
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 HWND hWnd;
@@ -14,7 +16,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
 	MSG msg;
 	BOOL ret;
 	WNDCLASSEX wc;
-
 
 	wc.cbSize = sizeof(WNDCLASSEX);
 	wc.style = CS_VREDRAW | CS_HREDRAW;
@@ -61,7 +62,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
 	char* tooltip_text = L"LimeTray";
 	wcscpy_s(nid.szTip, wcslen(tooltip_text) + 1, tooltip_text);
 	nid.hIcon = (HICON)LoadImage(hInstance, MAKEINTRESOURCE(IDB_PNG1), IMAGE_ICON, 32, 32, LR_SHARED);
-	nid.uCallbackMessage = WM_USER + 1;
+	nid.uCallbackMessage = NOTIFICATION_TRAY_ICON_MSG;
 
 	if (!Shell_NotifyIcon(NIM_ADD, &nid)) {
 		MessageBox(NULL, L"Tray icon creation failed.", L"Error!", MB_ICONEXCLAMATION | MB_OK);
@@ -70,7 +71,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
 
 	while ((ret = GetMessage(&msg, NULL, 0, 0)) != 0) {
 		if (ret == -1) {
-			fprintf(stderr, "Error getting message.\n");
+			MessageBox(NULL, L"Error getting message.", L"Error!", MB_ICONEXCLAMATION | MB_OK);
 			exit(1);
 		}
 		else {
@@ -87,6 +88,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg) {
 	case WM_CREATE:
 	{
+	} break;
+	case NOTIFICATION_TRAY_ICON_MSG:
+	{
+		switch (LOWORD(lParam)) {
+		case WM_RBUTTONDOWN:
+		case WM_LBUTTONDOWN:
+		{
+			MessageBox(NULL, L"clicked", L"Success!", MB_ICONINFORMATION | MB_OK);
+		} break;
+		}
+
 	} break;
 	default:
 	{
