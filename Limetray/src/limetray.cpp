@@ -2,9 +2,13 @@
 #include <shellapi.h>
 #include <stdio.h>
 
+#include <string>
+
 #include "../resource.h"
 
 #define NOTIFICATION_TRAY_ICON_MSG (WM_USER + 0x100)
+#define MENU_EXIT 0x01
+#define MENU_COPY 0x02
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -59,7 +63,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
 	nid.hWnd = hWnd;
 	nid.uID = IDB_PNG1;
 	nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP | NIF_INFO;
-	char* tooltip_text = L"LimeTray";
+	const wchar_t* tooltip_text = L"LimeTray";
 	wcscpy_s(nid.szTip, wcslen(tooltip_text) + 1, tooltip_text);
 	nid.hIcon = (HICON)LoadImage(hInstance, MAKEINTRESOURCE(IDB_PNG1), IMAGE_ICON, 32, 32, LR_SHARED);
 	nid.uCallbackMessage = NOTIFICATION_TRAY_ICON_MSG;
@@ -95,10 +99,34 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		case WM_RBUTTONDOWN:
 		case WM_LBUTTONDOWN:
 		{
-			MessageBox(NULL, L"clicked", L"Success!", MB_ICONINFORMATION | MB_OK);
+			HMENU popup_menu = CreatePopupMenu();
+			POINT click_point;
+			GetCursorPos(&click_point);
+
+			InsertMenu(popup_menu, 0, MF_BYPOSITION | MF_STRING, MENU_EXIT, L"Exit");
+			InsertMenu(popup_menu, 0, MF_BYPOSITION | MF_STRING, MENU_COPY, L"Copy something");
+			SetForegroundWindow(hWnd);
+			TrackPopupMenu(popup_menu, TPM_LEFTALIGN | TPM_TOPALIGN, click_point.x - 32, click_point.y - 32 - (2 * 10), 0, hWnd, NULL);
 		} break;
 		}
 
+	} break;
+	case WM_COMMAND:
+	{
+		if (LOWORD(wParam) == MENU_EXIT) {
+			PostQuitMessage(0);
+		}
+		else if (LOWORD(wParam) == MENU_COPY) {
+			const std::string text = "this is my test password that I want to copy..!";
+			const size_t len = text.size();
+			HGLOBAL mem = GlobalAlloc(GMEM_MOVEABLE, len);
+			memcpy(GlobalLock(mem), text.c_str(), len);
+			GlobalUnlock(mem);
+			OpenClipboard(0);
+			EmptyClipboard();
+			SetClipboardData(CF_TEXT, mem);
+			CloseClipboard();
+		}
 	} break;
 	default:
 	{

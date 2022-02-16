@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\limetray.c">
+    <ClCompile Include="src\limetray.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
