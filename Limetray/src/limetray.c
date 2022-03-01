@@ -1,4 +1,8 @@
+#ifndef UNICODE
 #define UNICODE
+#endif
+
+#pragma warning(disable: 6001)
 
 #include <windows.h>
 #include <shellapi.h>
@@ -11,6 +15,8 @@
 #define NOTIFICATION_TRAY_ICON_MSG (WM_USER + 0x100)
 #define MENU_EXIT 0x01
 #define MENU_COPY 0x02
+
+#define MENU_COPY_TEXT 0x03
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -102,11 +108,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		case WM_LBUTTONDOWN:
 		{
 			HMENU popup_menu = CreatePopupMenu();
+			HMENU copy_submenu = CreatePopupMenu();
+
 			POINT click_point;
 			GetCursorPos(&click_point);
 
 			InsertMenu(popup_menu, 0, MF_BYPOSITION | MF_STRING, MENU_EXIT, L"Exit");
 			InsertMenu(popup_menu, 0, MF_BYPOSITION | MF_STRING, MENU_COPY, L"Copy something");
+			InsertMenu(copy_submenu, 0, MF_BYPOSITION | MF_STRING, MENU_COPY_TEXT, L"Personify cloud");
+
 			SetForegroundWindow(hWnd);
 			TrackPopupMenu(popup_menu, TPM_LEFTALIGN | TPM_TOPALIGN, click_point.x - 32, click_point.y - 32 - (2 * 10), 0, hWnd, NULL);
 		} break;
@@ -127,7 +137,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			LPVOID s = GlobalLock(mem);
 			assert(s != NULL);
 				
-			memcpy(GlobalLock(mem), text, len);
+			memcpy(s, text, len);
 			GlobalUnlock(mem);
 			OpenClipboard(0);
 			EmptyClipboard();
