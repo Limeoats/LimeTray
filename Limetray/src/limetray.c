@@ -1,8 +1,7 @@
 #include <windows.h>
 #include <shellapi.h>
 #include <stdio.h>
-
-#include <string>
+#include <assert.h>
 
 #include "../resource.h"
 
@@ -117,10 +116,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			PostQuitMessage(0);
 		}
 		else if (LOWORD(wParam) == MENU_COPY) {
-			const std::string text = "this is my test password that I want to copy..!";
-			const size_t len = text.size();
+			const char text[1000] = "this is my test password that I want to copy..!";
+			const size_t len = sizeof(text);
 			HGLOBAL mem = GlobalAlloc(GMEM_MOVEABLE, len);
-			memcpy(GlobalLock(mem), text.c_str(), len);
+			assert(mem != NULL);
+			
+			LPVOID s = GlobalLock(mem);
+			assert(s != NULL);
+				
+			memcpy(GlobalLock(mem), text, len);
 			GlobalUnlock(mem);
 			OpenClipboard(0);
 			EmptyClipboard();
@@ -130,7 +134,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	} break;
 	default:
 	{
-		return DefWindowProc(hWnd, msg, wParam, lParam);
+		return DefWindowProcW(hWnd, msg, wParam, lParam);
 	}
 	}
 	return 0;
