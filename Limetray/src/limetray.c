@@ -1,3 +1,14 @@
+/*
+	TODO:
+	- Settings window that uses Propery Sheets for the tabs
+	- Copy settings tab
+		- Editable list view with two columns (name and string to copy)
+		- Button to add an extra row
+			- https://stackoverflow.com/questions/3217362/adding-items-to-a-listview
+		- Save button that will write the data to settings.cfg
+	- Update the Copy submenu to build its items based on the copy settings
+*/
+
 #ifndef UNICODE
 #define UNICODE
 #endif
@@ -14,7 +25,7 @@
 
 #define NOTIFICATION_TRAY_ICON_MSG (WM_USER + 0x100)
 #define MENU_EXIT 0x01
-#define MENU_COPY 0x02
+#define MENU_SETTINGS 0x02
 
 #define MENU_COPY_TEXT 0x03
 
@@ -22,6 +33,27 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 HWND hWnd;
 NOTIFYICONDATA nid = { 0 };
+
+static void copy_text_to_clipboard(const char* text, int len)
+{
+	HGLOBAL mem = GlobalAlloc(GMEM_MOVEABLE, len);
+	assert(mem != NULL);
+
+	LPVOID s = GlobalLock(mem);
+	assert(s != NULL);
+
+	memcpy(s, text, len);
+	GlobalUnlock(mem);
+	OpenClipboard(0);
+	EmptyClipboard();
+	SetClipboardData(CF_TEXT, mem);
+	CloseClipboard();
+}
+
+static BOOL file_exists(LPCTSTR path) {
+	DWORD a = GetFileAttributes(path);
+	return (a != INVALID_FILE_ATTRIBUTES && !(a & FILE_ATTRIBUTE_DIRECTORY));
+}
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, int nCmdShow)
 {
@@ -108,14 +140,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		case WM_LBUTTONDOWN:
 		{
 			HMENU popup_menu = CreatePopupMenu();
-			HMENU copy_submenu = CreatePopupMenu();
+			HMENU copy_submenu = CreateMenu();
 
 			POINT click_point;
 			GetCursorPos(&click_point);
 
-			InsertMenu(popup_menu, 0, MF_BYPOSITION | MF_STRING, MENU_EXIT, L"Exit");
-			InsertMenu(popup_menu, 0, MF_BYPOSITION | MF_STRING, MENU_COPY, L"Copy something");
-			InsertMenu(copy_submenu, 0, MF_BYPOSITION | MF_STRING, MENU_COPY_TEXT, L"Personify cloud");
+			AppendMenu(popup_menu, MF_POPUP | MF_STRING, (UINT_PTR)copy_submenu, L"Copy ");
+			AppendMenu(copy_submenu, MF_STRING | MF_POPUP, MENU_COPY_TEXT, L"Personify cloud");
+			AppendMenu(popup_menu, MF_POPUP | MF_STRING, MENU_SETTINGS, L"Settings");
+			AppendMenu(popup_menu, MF_BYPOSITION | MF_STRING, MENU_EXIT, L"Exit");
 
 			SetForegroundWindow(hWnd);
 			TrackPopupMenu(popup_menu, TPM_LEFTALIGN | TPM_TOPALIGN, click_point.x - 32, click_point.y - 32 - (2 * 10), 0, hWnd, NULL);
@@ -128,21 +161,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		if (LOWORD(wParam) == MENU_EXIT) {
 			PostQuitMessage(0);
 		}
-		else if (LOWORD(wParam) == MENU_COPY) {
-			const char text[1000] = "this is my test password that I want to copy..!";
-			const size_t len = sizeof(text);
-			HGLOBAL mem = GlobalAlloc(GMEM_MOVEABLE, len);
-			assert(mem != NULL);
-			
-			LPVOID s = GlobalLock(mem);
-			assert(s != NULL);
-				
-			memcpy(s, text, len);
-			GlobalUnlock(mem);
-			OpenClipboard(0);
-			EmptyClipboard();
-			SetClipboardData(CF_TEXT, mem);
-			CloseClipboard();
+		else if (LOWORD(wParam) == MENU_COPY_TEXT) {
+			char buffer[1000] = "personify cloud password copied..!";
+			copy_text_to_clipboard(buffer, sizeof(buffer));
+		}
+		else if (LOWORD(wParam) == MENU_SETTINGS) {
+			/*TCHAR buffer[1000];
+			GetCurrentDirectory(sizeof(buffer) / sizeof(TCHAR), buffer);*/
+			if (!file_exists(L"settings.cfg")) {
+				CreateFile(L"settings.cfg", GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+			}
 		}
 	} break;
 	default:

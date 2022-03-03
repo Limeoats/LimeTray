@@ -2,3 +2,4 @@
 *.exe
 x64
 build
+settings.cfg

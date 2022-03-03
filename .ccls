@@ -1,2 +1,0 @@
-clang++
-%h %c -std=c99 -D UNICODE
