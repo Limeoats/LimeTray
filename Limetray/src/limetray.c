@@ -17,6 +17,7 @@
 
 #include <windows.h>
 #include <shellapi.h>
+#include <prsht.h>
 #include <stdio.h>
 #include <assert.h>
 #include <stdio.h>
@@ -30,9 +31,14 @@
 #define MENU_COPY_TEXT 0x03
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+LRESULT CALLBACK WndProcSettings(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-HWND hWnd;
+HWND hWnd;	
+HWND hWndSettings;
 NOTIFYICONDATA nid = { 0 };
+
+PROPSHEETPAGE prop_sheet_pages[1];
+PROPSHEETHEADER prop_sheet_header;
 
 static void copy_text_to_clipboard(const char* text, int len)
 {
@@ -55,11 +61,23 @@ static BOOL file_exists(LPCTSTR path) {
 	return (a != INVALID_FILE_ATTRIBUTES && !(a & FILE_ATTRIBUTE_DIRECTORY));
 }
 
+static RECT get_center_of_window(HWND parent_window, int width, int height) {
+	RECT rect;
+	GetClientRect(parent_window, &rect);
+	rect.left = (rect.right / 2) - (width / 2);
+	rect.top = (rect.bottom / 2) - (height / 2);
+	return rect;
+}
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, int nCmdShow)
 {
 	MSG msg;
 	BOOL ret;
 	WNDCLASSEX wc;
+	WNDCLASSEX wc_settings;
+
+	InitCommonControlsEx();
+
 
 	wc.cbSize = sizeof(WNDCLASSEX);
 	wc.style = CS_VREDRAW | CS_HREDRAW;
@@ -98,6 +116,43 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
 		MessageBox(NULL, L"Window creation failed.", L"Error!", MB_ICONEXCLAMATION | MB_OK);
 		return 1;
 	}
+
+	// Initialize Settings window
+	wc_settings.cbSize = sizeof(WNDCLASSEX);
+	wc_settings.style = CS_VREDRAW | CS_HREDRAW;
+	wc_settings.lpfnWndProc = WndProcSettings;
+	wc_settings.cbClsExtra = 0;
+	wc_settings.cbWndExtra = 0;
+	wc_settings.hInstance = hInstance;
+	wc_settings.hIcon = (HICON)LoadImage(hInstance, MAKEINTRESOURCE(IDB_PNG1), IMAGE_ICON, 32, 32, LR_SHARED);
+	wc_settings.hCursor = LoadCursor(NULL, IDC_ARROW);
+	wc_settings.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
+	wc_settings.lpszMenuName = NULL;
+	wc_settings.lpszClassName = L"LimeTray Settings";
+	wc_settings.hIconSm = (HICON)LoadImage(hInstance, MAKEINTRESOURCE(IDB_PNG1), IMAGE_ICON, 32, 32, LR_SHARED);
+
+	if (!RegisterClassEx(&wc_settings)) {
+		MessageBox(NULL, L"Settings window registration failed.", L"Error!", MB_ICONEXCLAMATION | MB_OK);
+		return 1;
+	}
+
+	RECT center = get_center_of_window(GetDesktopWindow(), 640, 480);
+
+	hWndSettings = CreateWindowEx(
+		WS_EX_CLIENTEDGE,
+		L"LimeTray Settings",
+		L"LimeTray Settings",
+		WS_OVERLAPPEDWINDOW,
+		center.left,
+		center.top,
+		640,
+		480,
+		NULL,
+		NULL,
+		hInstance,
+		NULL
+	);
+
 
 	nid.cbSize = sizeof(NOTIFYICONDATA);
 	nid.hWnd = hWnd;
@@ -171,7 +226,29 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			if (!file_exists(L"settings.cfg")) {
 				CreateFile(L"settings.cfg", GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
 			}
+			ShowWindow(hWndSettings, SW_SHOW);
 		}
+	} break;
+	default:
+	{
+		return DefWindowProcW(hWnd, msg, wParam, lParam);
+	}
+	}
+	return 0;
+}
+
+LRESULT CALLBACK WndProcSettings(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+	switch (msg) {
+	case WM_CREATE:
+	{
+	} break;
+	case WM_COMMAND:
+	{
+	} break;
+	case WM_CLOSE:
+	{
+		ShowWindow(hWnd, SW_HIDE);
 	} break;
 	default:
 	{
