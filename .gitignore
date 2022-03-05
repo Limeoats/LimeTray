@@ -2,3 +2,5 @@
 *.exe
 x64
 build
+.git/*
+.ccls-cache
