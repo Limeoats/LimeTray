@@ -1,3 +1,8 @@
+@echo off
+pushd build
+make
+popd
+
 @REM @echo off
 
 @REM set DEBUG=1
@@ -21,7 +26,3 @@
 @REM gcc -Wall %FLAGS% limetray.exe ../Limetray/src/*.c icon.res -lgdi32 -luser32 -lshell32 -lcomctl32
 @REM echo Build completed
 
-@echo off
-pushd build
-make
-popd

@@ -15,8 +15,8 @@
 
 #pragma warning(disable: 6001)
 
-#include <windows.h>
-#include <shellapi.h>
+#include "limetray.h"
+
 #include <prsht.h>
 #include <commctrl.h>
 #include <stdio.h>
@@ -31,12 +31,15 @@
 
 #define MENU_COPY_TEXT 0x03
 
+#define SETTINGS_TAB_COPY 0x10
+
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK WndProcSettings(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-HWND hWnd;	
-HWND hWndSettings;
-NOTIFYICONDATA nid = { 0 };
+#define COPY_STRING_MAX_ROWS 32
+
+app_t* g_app;
+
 
 PROPSHEETPAGE prop_sheet_pages[1];
 PROPSHEETHEADER prop_sheet_header;
@@ -70,14 +73,77 @@ static RECT get_center_of_window(HWND parent_window, int width, int height) {
 	return rect;
 }
 
+static HWND create_settings_tabs(HWND hwnd_parent)
+{
+	RECT client_rect;
+	TCITEM tab_item;
+	INITCOMMONCONTROLSEX ctrls;
+	TCHAR buffer[256];
+	
+	ctrls.dwSize = sizeof(INITCOMMONCONTROLSEX);
+	ctrls.dwICC = ICC_TAB_CLASSES;
+
+	InitCommonControlsEx(&ctrls);
+
+	GetClientRect(hwnd_parent, &client_rect);
+	g_app->hwnd_settings_tabs = CreateWindow(WC_TABCONTROL, L"", WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE,
+		0, 0, client_rect.right, client_rect.bottom, hwnd_parent, NULL, g_app->hInst, NULL);
+	if (g_app->hwnd_settings_tabs == NULL) {
+		return NULL;
+	}
+
+	tab_item.mask = TCIF_TEXT | TCIF_IMAGE;
+	tab_item.iImage = -1;
+	tab_item.pszText = buffer;
+
+	wsprintf(buffer, L"Copy strings");
+	if (TabCtrl_InsertItem(g_app->hwnd_settings_tabs, SETTINGS_TAB_COPY, &tab_item) == -1) {
+		DestroyWindow(g_app->hwnd_settings_tabs);
+		return NULL;
+	}
+
+
+	wsprintf(buffer, L"Something else");
+	if (TabCtrl_InsertItem(g_app->hwnd_settings_tabs, SETTINGS_TAB_COPY + 0x01, &tab_item) == -1) {
+		DestroyWindow(g_app->hwnd_settings_tabs);
+		return NULL;
+	}
+	return g_app->hwnd_settings_tabs;
+}
+
+static void setup_copy_strings_settings()
+{
+    g_app->copy_strings_rows = calloc(COPY_STRING_MAX_ROWS, sizeof(copy_strings_row_t));
+	int n_rows = 1;
+	for (int i = 0; i < n_rows; ++i) 
+	{
+        TCHAR key1[10];
+        TCHAR key2[10];
+        sprintf(key1, "k%d", i);
+        sprintf(key2, "v%d", i);
+		HWND key_textbox = CreateWindowEx(WS_EX_CLIENTEDGE, L"edit_key", L"", WS_VISIBLE | WS_CHILD | WS_BORDER | ES_LEFT, 
+            100, 100, 50, 40, g_app->hwnd_settings_tabs, NULL, g_app->hInst, NULL);
+        HWND value_textbox = CreateWindowEx(WS_EX_CLIENTEDGE, L"edit_value", L"", WS_VISIBLE | WS_CHILD | WS_BORDER | ES_LEFT, 
+            200, 200, 50, 40, g_app->hwnd_settings_tabs, NULL, g_app->hInst, NULL);
+        copy_strings_row_t row = {
+            .hwnd_key_textbox = key_textbox,
+            .hwnd_value_textbox = value_textbox
+        };
+        g_app->copy_strings_rows[g_app->copy_string_index++] = row;
+	}
+}
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, int nCmdShow)
 {
+	g_app = malloc(sizeof(app_t));
+    g_app->copy_string_index = 0;
+
 	MSG msg;
 	BOOL ret;
 	WNDCLASSEX wc;
 	WNDCLASSEX wc_settings;
 
-	//InitCommonControlsEx();
+	g_app->hInst = hInstance;
 
 
 	wc.cbSize = sizeof(WNDCLASSEX);
@@ -85,20 +151,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
 	wc.lpfnWndProc = WndProc;
 	wc.cbClsExtra = 0;
 	wc.cbWndExtra = 0;
-	wc.hInstance = hInstance;
-	wc.hIcon = (HICON)LoadImage(hInstance, MAKEINTRESOURCE(IDB_PNG1), IMAGE_ICON, 32, 32, LR_SHARED);
+	wc.hInstance = g_app->hInst;
+	wc.hIcon = (HICON)LoadImage(g_app->hInst, MAKEINTRESOURCE(IDB_PNG1), IMAGE_ICON, 32, 32, LR_SHARED);
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wc.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
 	wc.lpszMenuName = NULL;
 	wc.lpszClassName = L"LimeTray";
-	wc.hIconSm = (HICON)LoadImage(hInstance, MAKEINTRESOURCE(IDB_PNG1), IMAGE_ICON, 32, 32, LR_SHARED);
+	wc.hIconSm = (HICON)LoadImage(g_app->hInst, MAKEINTRESOURCE(IDB_PNG1), IMAGE_ICON, 32, 32, LR_SHARED);
 
 	if (!RegisterClassEx(&wc)) {
 		MessageBox(NULL, L"Window registration failed.", L"Error!", MB_ICONEXCLAMATION | MB_OK);
 		return 1;
 	}
 
-	hWnd = CreateWindowEx(
+	g_app->hWnd = CreateWindowEx(
 		WS_EX_CLIENTEDGE,
 		L"LimeTray",
 		L"LimeTray",
@@ -113,7 +179,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
 		NULL
 	);
 
-	if (hWnd == NULL) {
+	if (g_app->hWnd == NULL) {
 		MessageBox(NULL, L"Window creation failed.", L"Error!", MB_ICONEXCLAMATION | MB_OK);
 		return 1;
 	}
@@ -124,13 +190,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
 	wc_settings.lpfnWndProc = WndProcSettings;
 	wc_settings.cbClsExtra = 0;
 	wc_settings.cbWndExtra = 0;
-	wc_settings.hInstance = hInstance;
-	wc_settings.hIcon = (HICON)LoadImage(hInstance, MAKEINTRESOURCE(IDB_PNG1), IMAGE_ICON, 32, 32, LR_SHARED);
+	wc_settings.hInstance = g_app->hInst;
+	wc_settings.hIcon = (HICON)LoadImage(g_app->hInst, MAKEINTRESOURCE(IDB_PNG1), IMAGE_ICON, 32, 32, LR_SHARED);
 	wc_settings.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wc_settings.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
 	wc_settings.lpszMenuName = NULL;
 	wc_settings.lpszClassName = L"LimeTray Settings";
-	wc_settings.hIconSm = (HICON)LoadImage(hInstance, MAKEINTRESOURCE(IDB_PNG1), IMAGE_ICON, 32, 32, LR_SHARED);
+	wc_settings.hIconSm = (HICON)LoadImage(g_app->hInst, MAKEINTRESOURCE(IDB_PNG1), IMAGE_ICON, 32, 32, LR_SHARED);
 
 	if (!RegisterClassEx(&wc_settings)) {
 		MessageBox(NULL, L"Settings window registration failed.", L"Error!", MB_ICONEXCLAMATION | MB_OK);
@@ -139,7 +205,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
 
 	RECT center = get_center_of_window(GetDesktopWindow(), 640, 480);
 
-	hWndSettings = CreateWindowEx(
+	g_app->hWndSettings = CreateWindowEx(
 		WS_EX_CLIENTEDGE,
 		L"LimeTray Settings",
 		L"LimeTray Settings",
@@ -150,21 +216,23 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
 		480,
 		NULL,
 		NULL,
-		hInstance,
+		g_app->hInst,
 		NULL
 	);
 
+	HWND hwnd_tabs = create_settings_tabs(g_app->hWndSettings);
+	setup_copy_strings_settings();
 
-	nid.cbSize = sizeof(NOTIFYICONDATA);
-	nid.hWnd = hWnd;
-	nid.uID = IDB_PNG1;
-	nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP | NIF_INFO;
+	g_app->nid.cbSize = sizeof(NOTIFYICONDATA);
+	g_app->nid.hWnd = g_app->hWnd;
+	g_app->nid.uID = IDB_PNG1;
+	g_app->nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP | NIF_INFO;
 	const wchar_t* tooltip_text = L"LimeTray";
-	wcscpy_s(nid.szTip, wcslen(tooltip_text) + 1, tooltip_text);
-	nid.hIcon = (HICON)LoadImage(hInstance, MAKEINTRESOURCE(IDB_PNG1), IMAGE_ICON, 32, 32, LR_SHARED);
-	nid.uCallbackMessage = NOTIFICATION_TRAY_ICON_MSG;
+	wcscpy_s(g_app->nid.szTip, wcslen(tooltip_text) + 1, tooltip_text);
+	g_app->nid.hIcon = (HICON)LoadImage(g_app->hInst, MAKEINTRESOURCE(IDB_PNG1), IMAGE_ICON, 32, 32, LR_SHARED);
+	g_app->nid.uCallbackMessage = NOTIFICATION_TRAY_ICON_MSG;
 
-	if (!Shell_NotifyIcon(NIM_ADD, &nid)) {
+	if (!Shell_NotifyIcon(NIM_ADD, &g_app->nid)) {
 		MessageBox(NULL, L"Tray icon creation failed.", L"Error!", MB_ICONEXCLAMATION | MB_OK);
 		return 1;
 	}
@@ -216,6 +284,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	{
 		if (LOWORD(wParam) == MENU_EXIT) {
 			PostQuitMessage(0);
+			free(g_app);
 		}
 		else if (LOWORD(wParam) == MENU_COPY_TEXT) {
 			char buffer[1000] = "personify cloud password copied..!";
@@ -227,7 +296,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			if (!file_exists(L"settings.cfg")) {
 				CreateFile(L"settings.cfg", GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
 			}
-			ShowWindow(hWndSettings, SW_SHOW);
+			ShowWindow(g_app->hWndSettings, SW_SHOW);
 		}
 	} break;
 	default:
@@ -250,6 +319,32 @@ LRESULT CALLBACK WndProcSettings(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPar
 	case WM_CLOSE:
 	{
 		ShowWindow(hWnd, SW_HIDE);
+	} break;
+	case WM_NOTIFY:
+	{
+		switch(((LPNMHDR)lParam)->code) 
+		{
+			case TCN_SELCHANGING:
+			{
+				return FALSE;
+			} break;
+			case TCN_SELCHANGE:
+			{
+				int tab_id = TabCtrl_GetCurSel(g_app->hwnd_settings_tabs);
+				switch (tab_id)
+				{
+					// 0 is the Copy strings section
+					case 0:
+					{
+                        for (int i = 0; i < g_app->copy_string_index; ++i)
+                        {
+                            ShowWindow(g_app->copy_strings_rows[i].hwnd_key_textbox, SW_SHOW);
+                            ShowWindow(g_app->copy_strings_rows[i].hwnd_value_textbox, SW_SHOW);
+                        }
+					}
+				}
+			} break;
+		}
 	} break;
 	default:
 	{

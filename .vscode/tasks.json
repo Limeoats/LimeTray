@@ -12,7 +12,7 @@
                 "cwd": "${workspaceFolder}"
             },
             "windows": {
-                "command": "call ${cwd}/build.bat"
+                "command": "${cwd}/build.bat"
             },
             "problemMatcher": []
         }
