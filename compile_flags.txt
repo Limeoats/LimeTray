@@ -1,5 +1,0 @@
-clang
-%h -x c++-header
--Wall
--Wextra
-%c -std=c99

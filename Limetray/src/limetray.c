@@ -18,6 +18,7 @@
 #include <windows.h>
 #include <shellapi.h>
 #include <prsht.h>
+#include <commctrl.h>
 #include <stdio.h>
 #include <assert.h>
 #include <stdio.h>
@@ -76,7 +77,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
 	WNDCLASSEX wc;
 	WNDCLASSEX wc_settings;
 
-	InitCommonControlsEx();
+	//InitCommonControlsEx();
 
 
 	wc.cbSize = sizeof(WNDCLASSEX);
